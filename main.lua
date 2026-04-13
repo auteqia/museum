@@ -1,4 +1,7 @@
--- Variable qui stocke la scène actuelle
+
+-- top screen is 400x240, bottom screen is 320x240
+
+
 local current_scene = nil
 
 -- Variables globales
@@ -148,14 +151,38 @@ end
 
 function draw_content(screen_name)
     if screen_name ~= "bottom" then
+
+
+        local cam_x = player.x - 200
+        local cam_y = player.y - 120
+
+        love.graphics.push()
+        love.graphics.translate(-math.floor(cam_x), -math.floor(cam_y))
+
         -- "top", "left" ou "right"
         love.graphics.setColor(1, 1, 1)
         drawMap() 
         
         love.graphics.setColor(0, 1, 0)
         love.graphics.circle("fill", player.x, player.y, 20)
+        love.graphics.pop()
         
     else
+        -- Fond d'écran (un gris/bleu foncé style menu RPG)
+        love.graphics.setColor(0.15, 0.15, 0.2)
+        love.graphics.rectangle("fill", 0, 0, 320, 240)
+
+        -- Un beau cadre blanc autour de l'écran
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", 5, 5, 310, 230)
+
+        -- Le texte d'interface 
+        love.graphics.print("Lieu : La Foret", 20, 20)
+        love.graphics.print("Inventaire :", 20, 60)
+        love.graphics.setColor(0.6, 0.6, 0.6)
+        love.graphics.print("- Vide", 40, 80)
+
         -- bottom screen
         if is_touching then
             love.graphics.setColor(0, 0.5, 1)
