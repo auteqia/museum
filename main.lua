@@ -134,8 +134,7 @@ function draw_content(screen_name)
             love.graphics.setColor(0, 0.5, 1)
             love.graphics.circle("fill", touch_x, touch_y, 10)
         end
-        love.graphics.setColor(1, 0, 0)
-        love.graphics.rectangle("line", 0, 0, 320, 240)
+
     end
 end
 
