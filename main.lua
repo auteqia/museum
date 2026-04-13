@@ -1,8 +1,14 @@
 -- Variable qui stocke la scène actuelle
 local current_scene = nil
-local sti = require("libs.sti") -- Attention : Utilise un point au lieu d'un slash !
 
-local map
+-- Variables globales
+local mapData
+local tilesetImage
+local quads = {} -- Va stocker chaque petit morceau de l'image
+local player = {}
+local touch_x, touch_y = 0, 0
+local is_touching = false
+local is_3ds = false
 
 -- Fonction qui vérifie si deux rectangles se touchent
 function checkCollision(x1, y1, w1, h1, x2, y2, w2, h2)
@@ -12,19 +18,51 @@ end
 function love.load()
     is_3ds = (love.system.getOS() == "Horizon")
     
-    -- On charge la carte !
-    map = sti("assets/lua/forest.lua")
+    -- 1. On charge la carte directement comme un simple fichier LUA
+    mapData = require("assets.lua.forest")
     
-    player = {}
+    -- 2. On charge l'image (LÖVE Potion chargera le .t3x en cachette sur 3DS)
+    tilesetImage = love.graphics.newImage("assets/tileset/forest.png")
+    
+    -- 3. LA MAGIE : On découpe le Tileset en petits carrés (Quads)
+    local tileW = mapData.tilesets[1].tilewidth
+    local tileH = mapData.tilesets[1].tileheight
+    local imgW = mapData.tilesets[1].imagewidth
+    local imgH = mapData.tilesets[1].imageheight
+    
+    local columns = math.floor(imgW / tileW)
+    local rows = math.floor(imgH / tileH)
+    
+    local id = 1
+    for y = 0, rows - 1 do
+        for x = 0, columns - 1 do
+            quads[id] = love.graphics.newQuad(x * tileW, y * tileH, tileW, tileH, imgW, imgH)
+            id = id + 1
+        end
+    end
+    
+    -- Initialisation du joueur
     player.x = 200
     player.y = 120
     player.speed = 200
+end
 
-    -- On garde ça désactivé pour l'instant
-    -- player.sprite = love.graphics.newImage("sprites/jeanne.png")
-    
-    touch_x, touch_y = 0, 0
-    is_touching = false
+-- Notre propre fonction d'affichage ultra-optimisée
+function drawMap()
+    local tileW = mapData.tilesets[1].tilewidth
+    local tileH = mapData.tilesets[1].tileheight
+
+    for _, layer in ipairs(mapData.layers) do
+        if layer.type == "tilelayer" then
+            for i, gid in ipairs(layer.data) do
+                if gid > 0 and quads[gid] then
+                    local x = ((i - 1) % layer.width) * tileW
+                    local y = math.floor((i - 1) / layer.width) * tileH
+                    love.graphics.draw(tilesetImage, quads[gid], x * 2, y * 2, 0, 2, 2)
+                end
+            end
+        end
+    end
 end
 
 function change_scene(scene_name)
@@ -35,113 +73,103 @@ function change_scene(scene_name)
 end
 
 function love.update(dt)
-    -- 1. Mise à jour de la map (indispensable pour STI)
-    if map then map:update(dt) end
-
-    -- 2. Récupération des directions (Clavier + Circle Pad)
     local dx, dy = 0, 0
     
-    -- Clavier (Mac)
-    if love.keyboard.isDown("right") then dx = 1 end
-    if love.keyboard.isDown("left") then dx = -1 end
-    if love.keyboard.isDown("down") then dy = 1 end
-    if love.keyboard.isDown("up") then dy = -1 end
+    -- 1. CONTRÔLES MAC (Clavier) - Protégé pour la 3DS !
+    if not is_3ds then
+        if love.keyboard and love.keyboard.isDown then
+            if love.keyboard.isDown("right") then dx = 1 end
+            if love.keyboard.isDown("left") then dx = -1 end
+            if love.keyboard.isDown("down") then dy = 1 end
+            if love.keyboard.isDown("up") then dy = -1 end
+        end
+    end
     
-    -- Circle Pad (3DS)
+    -- 2. CONTRÔLES 3DS (Circle Pad)
     local joysticks = love.joystick.getJoysticks()
     if #joysticks > 0 then
         local joy = joysticks[1]
-        -- On ne prend en compte le joystick que s'il sort de la "deadzone" (0.2)
         if math.abs(joy:getAxis(1)) > 0.2 then dx = joy:getAxis(1) end
         if math.abs(joy:getAxis(2)) > 0.2 then dy = joy:getAxis(2) end
     end
     
-    -- 3. Calcul de la position théorique (où le joueur veut aller)
     local next_x = player.x + dx * player.speed * dt
     local next_y = player.y + dy * player.speed * dt
     
-    -- 4. Gestion des collisions
+    -- 3. GESTION DES COLLISIONS (Adaptée pour notre code maison)
     local is_colliding = false
-    
-    -- Taille de la "boîte" de notre joueur (notre cercle fait 20 de rayon, donc 40x40)
     local p_w, p_h = 40, 40
     local p_x = next_x - 20
     local p_y = next_y - 20
 
-    -- On boucle sur les objets du calque "Collisions" de Tiled
-    if map.layers["Collisions"] then
-        for i, obj in ipairs(map.layers["Collisions"].objects) do
-            -- On multiplie les coordonnées de Tiled par 2 
-            -- parce qu'on dessine la map avec un zoom de 2 dans love.draw
-            local m_x = obj.x * 2
-            local m_y = obj.y * 2
-            local m_w = obj.width * 2
-            local m_h = obj.height * 2
+    for _, layer in ipairs(mapData.layers) do
+        if layer.name == "Collisions" and layer.type == "objectgroup" then
+            for _, obj in ipairs(layer.objects) do
+                local m_x = obj.x * 2
+                local m_y = obj.y * 2
+                local m_w = obj.width * 2
+                local m_h = obj.height * 2
 
-            -- Si la future position du joueur touche ce rectangle
-            if checkCollision(p_x, p_y, p_w, p_h, m_x, m_y, m_w, m_h) then
-                is_colliding = true
-                break -- On s'arrête dès qu'on touche un mur
+                if checkCollision(p_x, p_y, p_w, p_h, m_x, m_y, m_w, m_h) then
+                    is_colliding = true
+                    break
+                end
             end
         end
     end
 
-    -- 5. Application du mouvement seulement si le chemin est libre
     if not is_colliding then
         player.x = next_x
         player.y = next_y
     end
 
-    -- 6. Gestion du tactile (Ecran du bas)
-    if love.mouse.isDown(1) then
-        is_touching = true
-        local mx, my = love.mouse.getPosition()
-        
-        -- Si on est sur Mac, on adapte les coordonnées du simulateur
-        if not is_3ds then
+    -- 4. GESTION DE L'ÉCRAN TACTILE
+    if is_3ds then
+        local touches = love.touch.getTouches()
+        if #touches > 0 then
+            is_touching = true
+            local id = touches[1]
+            touch_x, touch_y = love.touch.getPosition(id)
+        else
+            is_touching = false
+        end
+    else
+        if love.mouse and love.mouse.isDown and love.mouse.isDown(1) then
+            is_touching = true
+            local mx, my = love.mouse.getPosition()
             touch_x = mx - 40
             touch_y = my - 260
         else
-            touch_x, touch_y = mx, my
+            is_touching = false
         end
-    else
-        is_touching = false
     end
 end
 
 function draw_content(screen_name)
-    if screen_name == "top" then
-        -- 1. ON REMET EN BLANC POUR LES VRAIES COULEURS DE LA FORÊT
+    -- Astuce : On ne cherche plus "top", on dit "tout ce qui n'est pas le bas" !
+    if screen_name ~= "bottom" then
+        -- 1. Écran du haut (que la 3DS l'appelle "top", "left" ou "right")
         love.graphics.setColor(1, 1, 1)
+        drawMap() 
         
-        -- 2. ON DESSINE LA CARTE (zoomée x2 pour le style rétro)
-        if map then map:draw(0, 0, 2, 2) end
-        
-        -- 3. On dessine ton personnage (le cercle vert pour l'instant)
         love.graphics.setColor(0, 1, 0)
         love.graphics.circle("fill", player.x, player.y, 20)
         
-        -- 4. Le texte par-dessus
-        love.graphics.setColor(1, 1, 1)
-        
     else
-        love.graphics.setColor(1, 0, 0)
-        
-        -- CORRECTION : J'ai désactivé cette ligne car player.sprite est vide (nil) !
-        -- love.graphics.draw(player.sprite, player.x, player.y)
-        
+        -- 2. Écran du bas ("bottom")
         if is_touching then
             love.graphics.setColor(0, 0.5, 1)
             love.graphics.circle("fill", touch_x, touch_y, 10)
         end
-
     end
 end
 
 function love.draw(screen)
     if is_3ds then
+        -- LÖVE Potion boucle tout seul sur les écrans de la console et passe le bon nom
         draw_content(screen)
     else
+        -- Simulation sur ton Mac
         love.graphics.push()
             draw_content("top")
         love.graphics.pop()
