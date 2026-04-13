@@ -9,8 +9,8 @@ return {
   height = 20,
   tilewidth = 16,
   tileheight = 16,
-  nextlayerid = 2,
-  nextobjectid = 1,
+  nextlayerid = 3,
+  nextobjectid = 15,
   properties = {},
   tilesets = {
     {
@@ -82,6 +82,36 @@ return {
         187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 260, 260, 260, 260, 260, 260, 260, 260, 260, 260, 301, 301, 301, 301, 301, 301, 301, 301, 301, 301,
         187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 260, 260, 260, 260, 260, 260, 260, 260, 260, 260, 301, 301, 301, 301, 301, 301, 301, 301, 301, 301,
         187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 260, 260, 260, 260, 260, 260, 260, 260, 260, 260, 301, 301, 301, 301, 301, 301, 301, 301, 301, 301
+      }
+    },
+    {
+      type = "objectgroup",
+      draworder = "topdown",
+      id = 2,
+      name = "Collisions",
+      class = "",
+      visible = true,
+      opacity = 1,
+      offsetx = 0,
+      offsety = 0,
+      parallaxx = 1,
+      parallaxy = 1,
+      properties = {},
+      objects = {
+        {
+          id = 8,
+          name = "bloc arbre",
+          type = "",
+          shape = "rectangle",
+          x = 0,
+          y = 112,
+          width = 160.25,
+          height = 48.25,
+          rotation = 0,
+          opacity = 1,
+          visible = false,
+          properties = {}
+        }
       }
     }
   }
