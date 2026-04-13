@@ -9,3 +9,14 @@ tools that I use:
 - LÖVEPOTION (2.4.0)
 - Tiled (for the map)
 - VScode
+
+
+TODO:
+- Inventory & better bottom screen
+- do sprites lol
+- make a door to change de map into another room
+- make a save system
+- make an exit system
+- make panel for lore dropping
+- make transition between two layouts
+- make items on the floor
