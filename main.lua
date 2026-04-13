@@ -18,13 +18,12 @@ end
 function love.load()
     is_3ds = (love.system.getOS() == "Horizon")
     
-    -- 1. On charge la carte directement comme un simple fichier LUA
     mapData = require("assets.lua.forest")
     
-    -- 2. On charge l'image (LÖVE Potion chargera le .t3x en cachette sur 3DS)
+    --  loading the image but in reality the 3ds will load the file in t3x format
     tilesetImage = love.graphics.newImage("assets/tileset/forest.png")
     
-    -- 3. LA MAGIE : On découpe le Tileset en petits carrés (Quads)
+    -- splitting the tileset into quads (sub-images) for easy drawing later. STI lib does this for us but its a hell of a pain to adapt to the 3DS (version and so on), so we do it ourselves!
     local tileW = mapData.tilesets[1].tilewidth
     local tileH = mapData.tilesets[1].tileheight
     local imgW = mapData.tilesets[1].imagewidth
@@ -41,13 +40,14 @@ function love.load()
         end
     end
     
-    -- Initialisation du joueur
+    -- player init
     player.x = 200
     player.y = 120
     player.speed = 200
 end
 
--- Notre propre fonction d'affichage ultra-optimisée
+-- STI replacement: we draw the map ourselves, layer by layer, tile by tile
+-- thanks gemini lol
 function drawMap()
     local tileW = mapData.tilesets[1].tilewidth
     local tileH = mapData.tilesets[1].tileheight
@@ -75,7 +75,7 @@ end
 function love.update(dt)
     local dx, dy = 0, 0
     
-    -- 1. CONTRÔLES MAC (Clavier) - Protégé pour la 3DS !
+    -- for computer
     if not is_3ds then
         if love.keyboard and love.keyboard.isDown then
             if love.keyboard.isDown("right") then dx = 1 end
@@ -85,7 +85,7 @@ function love.update(dt)
         end
     end
     
-    -- 2. CONTRÔLES 3DS (Circle Pad)
+    -- 3ds controls
     local joysticks = love.joystick.getJoysticks()
     if #joysticks > 0 then
         local joy = joysticks[1]
@@ -95,8 +95,9 @@ function love.update(dt)
     
     local next_x = player.x + dx * player.speed * dt
     local next_y = player.y + dy * player.speed * dt
-    
-    -- 3. GESTION DES COLLISIONS (Adaptée pour notre code maison)
+
+
+    -- collisions
     local is_colliding = false
     local p_w, p_h = 40, 40
     local p_x = next_x - 20
@@ -123,7 +124,7 @@ function love.update(dt)
         player.y = next_y
     end
 
-    -- 4. GESTION DE L'ÉCRAN TACTILE
+    -- the 3DS has a touch screen, so we check if the player is touching it and where
     if is_3ds then
         local touches = love.touch.getTouches()
         if #touches > 0 then
@@ -146,9 +147,8 @@ function love.update(dt)
 end
 
 function draw_content(screen_name)
-    -- Astuce : On ne cherche plus "top", on dit "tout ce qui n'est pas le bas" !
     if screen_name ~= "bottom" then
-        -- 1. Écran du haut (que la 3DS l'appelle "top", "left" ou "right")
+        -- "top", "left" ou "right"
         love.graphics.setColor(1, 1, 1)
         drawMap() 
         
@@ -156,7 +156,7 @@ function draw_content(screen_name)
         love.graphics.circle("fill", player.x, player.y, 20)
         
     else
-        -- 2. Écran du bas ("bottom")
+        -- bottom screen
         if is_touching then
             love.graphics.setColor(0, 0.5, 1)
             love.graphics.circle("fill", touch_x, touch_y, 10)
